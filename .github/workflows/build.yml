@@ -16,6 +16,10 @@ on:
       - master
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     name: Build hl2_nx.nro
@@ -31,7 +35,8 @@ jobs:
           fetch-depth: 0
 
       - name: Compute short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+        run: |
+          echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
 
       - name: Install portlibs
         run: |
@@ -39,7 +44,7 @@ jobs:
 
           dkp-pacman -Syu --noconfirm
 
-          dkp-pacman -S --noconfirm \
+          dkp-pacman -S --needed --noconfirm \
             switch-sdl2 \
             switch-sdl2_image \
             switch-mesa \
@@ -56,7 +61,7 @@ jobs:
           echo "DEVKITPRO=${DEVKITPRO:-/opt/devkitpro}"
           echo "DEVKITA64=${DEVKITA64:-/opt/devkitpro/devkitA64}"
 
-          ${DEVKITPRO:-/opt/devkitpro}/devkitA64/bin/aarch64-none-elf-gcc --version | head -1
+          "${DEVKITPRO:-/opt/devkitpro}/devkitA64/bin/aarch64-none-elf-gcc" --version | head -1
 
           dkp-pacman -Q | grep -E '^(devkitA64|libnx|switch-)' || true
 
@@ -71,17 +76,17 @@ jobs:
             hl2_nx.elf \
             hl2_nx.nacp
 
-      - name: Stage artefacts
+      - name: Stage artifacts
         run: |
           set -euo pipefail
 
-          mkdir -p artefacts
+          mkdir -p artifacts
 
-          cp hl2_nx.nro artefacts/
-          cp hl2_nx.nacp artefacts/
-          cp hl2_nx.elf artefacts/
+          cp hl2_nx.nro artifacts/
+          cp hl2_nx.nacp artifacts/
+          cp hl2_nx.elf artifacts/
 
-          cat > artefacts/README.txt <<EOF
+          cat > artifacts/README.txt <<EOF
           Half-Life 2 - Nintendo Switch port (aarvsn fork)
 
           Build: ${SHORT_SHA}
@@ -96,11 +101,11 @@ jobs:
           ${GITHUB_SHA}
           EOF
 
-      - name: Upload build artefacts
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: hl2_nx-${{ env.SHORT_SHA }}
-          path: artefacts/*
+          path: artifacts/*
           retention-days: 30
           if-no-files-found: error
 
@@ -116,9 +121,10 @@ jobs:
 
     steps:
       - name: Compute short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+        run: |
+          echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
 
-      - name: Download artefact
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: hl2_nx-${{ env.SHORT_SHA }}
