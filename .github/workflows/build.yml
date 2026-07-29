@@ -1,0 +1,118 @@
+name: Build NRO
+
+# Builds the Switch NRO on every push and PR, then publishes a release
+# artifact whenever a `v*` tag is pushed.
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build hl2_nx.nro
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkita64:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install portlibs
+        # devkitpro/devkita64 ships devkitA64 + libnx, but not the portlibs
+        # (switch-sdl2, switch-ffmpeg, etc.) — pull them with dkp-pacman.
+        run: |
+          set -euo pipefail
+          sudo dkp-pacman -Sy --noconfirm \
+            switch-sdl2 \
+            switch-sdl2_image \
+            switch-mesa \
+            switch-libdrm_nouveau \
+            switch-zlib \
+            switch-ffmpeg \
+            switch-bz2 \
+            switch-dav1d \
+            switch-libjpeg-turbo \
+            switch-libpng \
+            switch-libwebp
+
+      - name: Show toolchain versions
+        run: |
+          echo "DEVKITPRO=${DEVKITPRO:-/opt/devkitpro}"
+          echo "DEVKITARM=${DEVKITARM:-/opt/devkitpro/devkitA64}"
+          ${DEVKITPRO:-/opt/devkitpro}/devkitA64/bin/aarch64-none-elf-gcc --version | head -1
+          dkp-pacman -Q | grep -E '^(devkitA64|libnx|switch-)' || true
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          make -j$(nproc)
+          ls -lh hl2_nx.nro hl2_nx.elf hl2_nx.nacp
+
+      - name: Stage artefacts
+        run: |
+          set -euo pipefail
+          mkdir -p artefacts
+          cp hl2_nx.nro artefacts/
+          cp hl2_nx.nacp artefacts/
+          cp hl2_nx.elf artefacts/
+          # Tiny readme so users know what to do with the NRO
+          cat > artefacts/README.txt <<EOF
+          Half-Life 2 - Nintendo Switch port (aarvsn fork)
+          Build: ${GITHUB_SHA::7}
+          Date:  $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          Install:
+            1. Copy hl2_nx.nro to /switch/hl2_nx/ on your SD card.
+            2. Follow the rest of the install guide at
+               https://github.com/aarvsn/hl2-nx#quick-start
+
+          This artefact was built by GitHub Actions from commit
+          ${GITHUB_SHA}.
+          EOF
+
+      - name: Upload build artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hl2_nx-${{ github.sha::7 }}
+          path: artefacts/*
+          retention-days: 30
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artefact
+        uses: actions/download-artifact@v4
+        with:
+          name: hl2_nx-${{ github.sha::7 }}
+          path: release
+
+      - name: Zip for release
+        run: |
+          set -euo pipefail
+          cd release
+          zip -r ../hl2_nx-${{ github.ref_name }}.zip .
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            hl2_nx-${{ github.ref_name }}.zip
+            release/hl2_nx.nro
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

@@ -1,0 +1,20 @@
+# Build artefacts
+build/
+*.o
+*.d
+*.map
+*.nacp
+*.elf
+*.nro
+
+# Editor / OS cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local toolchain overrides
+.deps/
