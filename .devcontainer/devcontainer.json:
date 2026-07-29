@@ -1,0 +1,15 @@
+{
+  "name": "HL2-NX",
+  "image": "devkitpro/devkita64:latest",
+  "remoteUser": "root",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  },
+  "postCreateCommand": "dkp-pacman -Syu --noconfirm && dkp-pacman -S --needed --noconfirm switch-dev switch-sdl2 switch-sdl2_image switch-mesa switch-libdrm_nouveau switch-ffmpeg switch-dav1d"
+}
